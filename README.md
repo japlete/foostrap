@@ -5,7 +5,7 @@ Foostrap is a simple Python library for efficient bootstrap resampling and confi
 
 ## Features
 
-- Parallel by default using Numba
+- Parallel by default using Numba. Typically at least 4x faster than the current Scipy bootstrap. See benchmark notebook [here](https://github.com/japlete/foostrap/blob/main/benchmark.ipynb).
 - Implements the Bias-Corrected and Accelerated (BCa) method for CI estimation. Can also use percentiles.
 - Optimized for sparse and binary data. The number of zeros is drawn from a Binomial distribution, instead of resampling them individually.
 - Supported statistics:
@@ -13,6 +13,7 @@ Foostrap is a simple Python library for efficient bootstrap resampling and confi
     - 2-sample mean difference
     - 1-sample ratio of sums
     - 2-sample ratio of sums difference
+- Robust: unit tests validate edge cases and results within 2 decimal places from Scipy bootstrap.
 
 ## Installation
 

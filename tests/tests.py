@@ -69,6 +69,19 @@ class TestIllegalMath(unittest.TestCase):
         with self.assertWarns(UserWarning):
             foostrap(np.concatenate((np.ones((100,2)), np.array([1,0]).reshape(-1,2))), random_state=0, parallel=False)
 
+class TestMixedSparsity(unittest.TestCase):
+    def test_dense_sparse(self):
+        res = foostrap(np.full(3, 2), rand_arr1d)
+        self.assertFalse(np.isnan(res.ci).any() or np.isnan(res.boot_samples).any(), 'There are nan values in output')
+
+    def test_bin_sparse(self):
+        res = foostrap(rng.binomial(1,0.5,200), rand_arr1d)
+        self.assertFalse(np.isnan(res.ci).any() or np.isnan(res.boot_samples).any(), 'There are nan values in output')
+
+    def test_bin_dense(self):
+        res = foostrap(rng.binomial(1,0.5,200), np.full(3, 2))
+        self.assertFalse(np.isnan(res.ci).any() or np.isnan(res.boot_samples).any(), 'There are nan values in output')
+
 #Statistic functions for the Scipy execution
 def mean_dif(x, y, axis= -1):
     return np.mean(x, axis= axis) - np.mean(y, axis= axis)

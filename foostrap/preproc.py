@@ -103,7 +103,7 @@ def preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_
         if is_bin1 and is_bin2:
             core_func = bstrap_core_mean_bin
             parallel= False
-        elif (is_bin1 and len(x2t) < n2) or (len(x1t) < n1 and is_bin2) or (len(x1t) < n1 and len(x2t) < n2):
+        elif len(x2t) < n2 or len(x1t) < n1:
             core_func = bstrap_core_mean_sparse
         else:
             core_func = bstrap_core_mean

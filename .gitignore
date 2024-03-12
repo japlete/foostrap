@@ -2,5 +2,6 @@ foostrap/.ipynb_checkpoints/*
 foostrap/__pycache__/*
 tests/.ipynb_checkpoints/*
 *.ipynb
+!benchmark.ipynb
 .ipynb_checkpoints/*
 dist/*
