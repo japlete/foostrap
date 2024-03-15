@@ -1,7 +1,9 @@
+# -*- coding: utf-8 -*-
 import numpy as np
-from numba import njit, get_num_threads, prange
+from numba import get_num_threads
 from dataclasses import dataclass
 from .preproc import preproc_args
+from .samplers import core_parallelizer
 
 @dataclass
 class BootRes:
@@ -9,26 +11,19 @@ class BootRes:
     ci: tuple
     boot_samples: np.array
 
-@njit(parallel= True, cache=True)
-def core_parallelizer(core_func, x1, x2, gens, n1, n2, n_boot):
-    # Use numba to distribute bootstrap sampling iterations equally among threads. Each thread has its own generator
-    nt = len(gens)
-    thread_samps = np.array([n_boot // nt] * nt) + np.array([1] * (n_boot % nt) + [0] * (nt - (n_boot % nt)))
-    idxs = [0] + list(np.cumsum(thread_samps))
-    boot_stat = np.empty(n_boot)
-    for i in prange(nt):
-        boot_stat[idxs[i] : idxs[i+1]] = core_func(x1, x2, thread_samps[i], gens[i], n1, n2)
-    return boot_stat
-
-def foostrap(x1, x2= None, boot_samples= 10000, conf_lvl= 0.95, alternative= 'two-sided', ci_method= 'BCa', random_state= None, parallel= True, ignore_sparse_below= 0.1):
+def foostrap(x1, x2= None, statistic= 'auto', q= 0.5, boot_samples= 10000, conf_lvl= 0.95, alternative= 'two-sided', ci_method= 'BCa', random_state= None, parallel= True, ignore_sparse_below= 0.1):
     '''
-    Perform parallel bootstrap sampling and confidence interval estimation for one or two data samples.
-    The available statistics are mean and ratio of sums, which get automatically recognized based on the number of dimensions of the input.
-    If the data is sparse and using the mean statistic, the number of zeros in each sample is generated from a Binomial distribution, instead of resampling the zeros directly.
+    Perform parallel bootstrap sampling and confidence interval estimation.
+    The available statistics are:
+    - For 1-dimensional data: mean, standard deviation, quantile q
+    - For 2-dimensional paired data: ratio of sums, weighted mean and pearson correlation
+    To compare two independent samples (e.g. mean difference), use the argument x2 for the second sample.
 
     Parameters:
-    - x1 (numpy.ndarray): Primary sample array. If 1-D, the mean statistic is used. If 2-D, the ratio of sums is used, as x1[:,0].sum() / x1[:,1].sum()
+    - x1 (numpy.ndarray): Primary sample array. If observations are paired, the shape must be a 2-column array.
     - x2 (numpy.ndarray, optional): Second sample to compare against x1, as statistic(x1) - statistic(x2). Default is None.
+    - statistic (one of 'mean','std','quantile','ratio','wmean','pearson','auto'): the statistic to compute over each sample. Default 'auto' ('mean' for 1D sample, 'ratio' for 2D sample).
+    - q (float): probability for the 'quantile' statistic. Ignored otherwise. Default 0.5 (the median)
     - boot_samples (int): Number of bootstrap samples to generate. Must be greater than zero. Default is 10000.
     - conf_lvl (float): Confidence level for the confidence interval, between 0 and 1. Default is 0.95.
     - alternative (str): Type of confidence interval. 'two-sided': with upper and lower bound, 'less': only upper bound, 'greater': only lower bound. Default 'two-sided'.
@@ -40,23 +35,33 @@ def foostrap(x1, x2= None, boot_samples= 10000, conf_lvl= 0.95, alternative= 'tw
     Returns:
     BootRes: A dataclass containing the confidence interval (ci) as a tuple and the bootstrap samples (boot_samples) as a numpy array.
     
-    Example:
+    Example 1: mean statistic, 1-sample
     >>> x1 = np.random.normal(0, 1, size=100)
     >>> result = foostrap(x1)
     >>> print(result.ci)
     (-0.199, 0.204)
+
+    Example 2: weighted mean difference statistic, 2-sample
+    >>> x1 = np.random.lognormal(0, 1, size= (100, 2))
+    >>> x2 = np.random.lognormal(0, 1, size= (100, 2))
+    >>> result = foostrap(x1, x2, statistic= 'wmean')
+    >>> print(result.ci)
+    (-1.04, 0.194)
     '''
     # Validate and preprocess arguments
-    x1t, x2t, rng, parallel, n1, n2, ci_alphas, core_func, jack_func, ci_func = preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_state, parallel, ignore_sparse_below)
+    x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, stat_func1, stat_func2, jack_func, ci_func = \
+        preproc_args(x1, x2, statistic, q, boot_samples, conf_lvl, alternative, ci_method, random_state, parallel, ignore_sparse_below)
 
     # If parallel, split generators and call the numba multicore wrapper
     if parallel:
         nt = get_num_threads()
         gens = tuple(rng.spawn(nt))
-        boot_stat = core_parallelizer(core_func, x1t, x2t, gens, n1, n2, boot_samples)
+        boot_stat = core_parallelizer(sampler_func1, sampler_func2, stat_func1, stat_func2, x1t, x2t, gens, n1, n2, boot_samples, q)
     else:
-        # Single core directly calls core_func
-        boot_stat = core_func(x1t, x2t, boot_samples, rng, n1, n2)
+        # Single core directly calls the sampler
+        boot_stat = sampler_func1(x1t, boot_samples, rng, n1, stat_func1, q)
+        if n2 > 0:
+            boot_stat -= sampler_func2(x2t, boot_samples, rng, n2, stat_func2, q)
 
     # Get confidence intervals for the bootstrap samples
     quants = ci_func(boot_stat, ci_alphas, jack_func, x1t, x2t, n1, n2)

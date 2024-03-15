@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
 import numpy as np
-from .estimators import bstrap_core_mean_bin, bstrap_core_mean_sparse, bstrap_core_mean, jacknife_mean, bstrap_core_ratio, jacknife_ratio, ci_est_percent, ci_est_bca
+from scipy.stats import mode
+from .estimators import stat_func_map, jack_func_map, ci_est_percent, ci_est_bca
+from .samplers import sampler_map
 import warnings
 
 def check_sparsity(x, n, min_zeros= 0.1):
@@ -12,7 +15,14 @@ def check_sparsity(x, n, min_zeros= 0.1):
         ret = x
     return is_bin, ret
 
-def preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_state, parallel, ignore_sparse_below):
+def warn_pearson(x, n, nboot, threshold):
+    # Warn user if probability of a sample of equal values exceeds threshold
+    m,k = mode(x)
+    prob = 1.0 - (1.0-(k/n)**n)**nboot
+    if prob > threshold:
+        warnings.warn(f'The value {m} is repeated {k} times out of {n} observations. There is a {np.round(prob, int(np.ceil(-np.log10(threshold))))*100} % probability of getting at least 1 nan sample out of {nboot} due to zero denominator.', stacklevel=2)
+
+def preproc_args(x1, x2, statistic, q, boot_samples, conf_lvl, alternative, ci_method, random_state, parallel, ignore_sparse_below):
     # Check validity of each argument, and preprocess them
     
     # x1
@@ -23,15 +33,17 @@ def preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_
         raise ValueError("If x1 is 2-dimensional, the second dimension must be of length 2.")
     elif x1t.ndim == 0:
         x1t = x1t.reshape(-1)
-    stat_is_mean = x1t.ndim == 1
-    x1_valid = np.isfinite(x1t) if stat_is_mean else np.isfinite(x1t).all(axis=1)
+    is_1d = x1t.ndim == 1
+    x1_valid = np.isfinite(x1t) if is_1d else np.isfinite(x1t).all(axis=1)
     n1 = x1_valid.sum()
     if n1 == 0:
         if len(x1t) == 0:
             raise ValueError("x1 cannot be empty")
         else:
             raise ValueError("x1 must contain at least 1 valid number")
-    x1t = x1t[x1_valid] if stat_is_mean else x1t[x1_valid,:].T.copy()
+    x1t = x1t[x1_valid] if is_1d else x1t[x1_valid,:].T.copy()
+    if x1t.dtype == bool:
+        x1t = x1t.astype(np.uint8)
     
     # x2
     if x2 is not None:
@@ -42,16 +54,32 @@ def preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_
             raise ValueError("x2 must have the same number of dimensions as x1.")
         elif x2t.ndim == 2 and x2t.shape[1] != 2:
             raise ValueError("If x2 is 2-dimensional, the second dimension must be of length 2.")
-        x2_valid = np.isfinite(x2t) if stat_is_mean else np.isfinite(x2t).all(axis=1)
+        x2_valid = np.isfinite(x2t) if is_1d else np.isfinite(x2t).all(axis=1)
         n2 = x2_valid.sum()
         if n2 == 0:
             raise ValueError("x2 must have at least 1 valid number, or be omitted.")
         else:
-            x2t = x2t[x2_valid] if stat_is_mean else x2t[x2_valid,:].T.copy()
+            x2t = x2t[x2_valid] if is_1d else x2t[x2_valid,:].T.copy()
     else:
         n2 = 0
-        x2t = np.array([], dtype= x1t.dtype) if stat_is_mean else np.array([], dtype= x1t.dtype).reshape((2,-1))
+        x2t = np.array([], dtype= x1t.dtype) if is_1d else np.array([], dtype= x1t.dtype).reshape((2,-1))
+    if x2t.dtype == bool:
+        x2t = x2t.astype(np.uint8)
         
+    # statistic
+    if statistic not in ('auto','mean','std','quantile','ratio','wmean','pearson'):
+        raise ValueError("statistic must be one of ('auto','mean','std','quantile','ratio','wmean','pearson')")
+    if statistic in ('mean','std','quantile') and not is_1d:
+        raise ValueError(f"statistic {statistic} is only available for 1-dimensional arrays")
+    if statistic in ('ratio','wmean','pearson') and is_1d:
+        raise ValueError(f"statistic {statistic} is only available for 2-dimensional arrays")
+    if statistic == 'auto':
+        statistic = 'mean' if is_1d else 'ratio'
+
+    # q
+    if statistic == 'quantile' and not (isinstance(q, (float,int)) and 0 <= q <= 1):
+        raise ValueError("q must be a single number between 0 and 1")
+    
     # boot_samples
     if not isinstance(boot_samples, int) or boot_samples <= 0:
         raise ValueError("boot_samples must be an integer greater than 0.")
@@ -92,33 +120,46 @@ def preproc_args(x1, x2, boot_samples, conf_lvl, alternative, ci_method, random_
     if not (isinstance(ignore_sparse_below, (float, int)) and 0 <= ignore_sparse_below <= 1):
         raise ValueError("ignore_sparse_below must be a float greater or equal to 0 and less or equal to 1.")
 
-    # If using mean statistic, check sparsity of samples and pick corresponding resampler (core_func) and jacknife estimator. 
-    # If using ratio statistic, sparsity doesn't apply
-    if stat_is_mean:
+    # If arrays are 1D, check sparsity of samples
+    if is_1d:
         is_bin1, x1t = check_sparsity(x1t, n1, min_zeros= ignore_sparse_below)
         if n2 > 0:
             is_bin2, x2t = check_sparsity(x2t, n2, min_zeros= ignore_sparse_below)
         else:
             is_bin2 = True
+        # Pick corresponding sampler and statistic function
+        is_sparse1 = (not is_bin1) and (len(x1t) < n1)
+        is_sparse2 = (not is_bin2) and (len(x2t) < n2)
+        extra_arg = statistic in ('quantile',)
+        sampler_func1 = sampler_map[(is_bin1, is_sparse1, extra_arg)]
+        sampler_func2 = sampler_map[(is_bin2, is_sparse2, extra_arg)]
+        stat_func1 = stat_func_map[(statistic, is_bin1, is_sparse1)]
+        stat_func2 = stat_func_map[(statistic, is_bin2, is_sparse2)]
         if is_bin1 and is_bin2:
-            core_func = bstrap_core_mean_bin
-            parallel= False
-        elif len(x2t) < n2 or len(x1t) < n1:
-            core_func = bstrap_core_mean_sparse
-        else:
-            core_func = bstrap_core_mean
-        jack_func = jacknife_mean
+            parallel = False
     else:
-        core_func = bstrap_core_ratio
-        jack_func = jacknife_ratio
+        # If using paired statistics, sparsity doesn't apply
+        sampler_func1, sampler_func2 = sampler_map['2d'], sampler_map['2d']
+        stat_func1, stat_func2 = stat_func_map[statistic], stat_func_map[statistic]
+    
+    # Get jacknife estimator
+    jack_func = jack_func_map[statistic] if statistic != 'quantile' else lambda x, n1, n2 : jack_func_map['quantile'](x, n1, n2, q)
     
     # Set function for confidence interval estimation (percentile or BCa)
     if n1 == 1 or n2 == 1:
         ci_method = 'percentile'
     ci_func = ci_est_percent if ci_method == 'percentile' else ci_est_bca
 
-    # Warn user if doing ratio of sums with zeros in the denominator
-    if not stat_is_mean and (np.any(x1t[1,:] == 0) or np.any(x2t[1,:] == 0)):
-        warnings.warn('Zeros detected in the denominator values. This could cause a division by zero over a random resampling')
+    # Warn user if doing dividing by sums that contain zeros
+    if statistic in ('ratio','wmean') and (np.any(x1t[1,:] == 0) or np.any(x2t[1,:] == 0)):
+        warnings.warn('Zeros detected in the denominator values. This could cause a division by zero over a random resampling. These samples will be recorded as nan', stacklevel=2)
+
+    # Warn user if many obsevations for the pearson correlation are equal (risk of zero variance in denominator)
+    if statistic in ('pearson',):
+        warn_pearson(x1t[0,:], n1, boot_samples, 0.001)
+        warn_pearson(x1t[1,:], n1, boot_samples, 0.001)
+        if n2 > 0:
+            warn_pearson(x2t[0,:], n2, boot_samples, 0.001)
+            warn_pearson(x2t[1,:], n2, boot_samples, 0.001)
     
-    return x1t, x2t, rng, parallel, n1, n2, ci_alphas, core_func, jack_func, ci_func
+    return x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, stat_func1, stat_func2, jack_func, ci_func
