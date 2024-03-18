@@ -207,6 +207,7 @@ def ci_est_bca(samps, ci_alphas, jack_func, x1, x2, n1, n2):
         ci_hi = min(1.0, norm.cdf(b + per_norm_hi/(1.0 - acc*per_norm_hi)))
     return ci_est_percent(samps, (ci_lo, ci_hi), jack_func, x1, x2, n1, n2)
 
+# (Statistic, Binary, Sparse) -> estimator function
 stat_func_map = {('mean',False,False) : numba_mean,
                  ('mean',False,True) : numba_mean_sparse,
                  ('mean',True,False) : numba_mean_bin,
@@ -221,6 +222,7 @@ stat_func_map = {('mean',False,False) : numba_mean,
                  'pearson' : pearson_rows,
                 }
 
+# Statistic -> jackknife estimator
 jack_func_map = {'mean' : jacknife_mean,
                  'std' : jacknife_std,
                  'quantile' : jacknife_quantile,

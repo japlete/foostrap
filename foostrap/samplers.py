@@ -80,6 +80,7 @@ def bstrap_sampler_2d(x, n_boot, gen, n, stat_func, arg):
         boot_stat[i] = stat_func(x[:,gen.integers(0, n, size= n, dtype= np.uint64)])
     return boot_stat
 
+# (Binary, Sparse, With argument) -> sampler func
 sampler_map = {(False,False,False) : bstrap_sampler_1d,
                (False,True,False) : bstrap_sampler_1d_sparse,
                (True,False,False) : bstrap_sampler_1d_bin,
