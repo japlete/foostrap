@@ -66,7 +66,7 @@ print(result.ci)
 A data class containing the confidence interval (`ci`) as a tuple and the bootstrap samples (`boot_samples`) as a numpy array.
 
 ### Notes
-1. The first execution will take a few seconds longer since Numba takes time to compile the function for the first time. For benchmarking, use subsequent runs.
+1. The first execution will take a few seconds longer since Numba takes time to compile the functions for the first time. The compiled functions are cached in the `__pycache__` in the library installation directory. You can save the cached functions and reuse them in another machine, as long as it has the same package versions and CPU.
 2. Each thread gets a separate random generator, spawned from the user supplied or the default. This means that for the results to be reproducible, the number of CPU cores must remain constant.
 3. Only the 1-D statistics have the sparse and binary data optimization, since paired data typically doesn't have zeros in both values of an observation.
 

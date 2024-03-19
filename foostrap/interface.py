@@ -3,7 +3,6 @@ import numpy as np
 from numba import get_num_threads
 from dataclasses import dataclass
 from .preproc import preproc_args
-from .samplers import core_parallelizer
 
 @dataclass
 class BootRes:
@@ -49,19 +48,17 @@ def foostrap(x1, x2= None, statistic= 'auto', q= 0.5, boot_samples= 10000, conf_
     (-1.04, 0.194)
     '''
     # Validate and preprocess arguments
-    x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, stat_func1, stat_func2, jack_func, ci_func = \
+    x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, stat_name, jack_func, ci_func = \
         preproc_args(x1, x2, statistic, q, boot_samples, conf_lvl, alternative, ci_method, random_state, parallel, ignore_sparse_below)
 
     # If parallel, split generators and call the numba multicore wrapper
     if parallel:
-        nt = get_num_threads()
-        gens = tuple(rng.spawn(nt))
-        boot_stat = core_parallelizer(sampler_func1, sampler_func2, stat_func1, stat_func2, x1t, x2t, gens, n1, n2, boot_samples, q)
+        gens = tuple(rng.spawn(get_num_threads()))
     else:
-        # Single core directly calls the sampler
-        boot_stat = sampler_func1(x1t, boot_samples, rng, n1, stat_func1, q)
-        if n2 > 0:
-            boot_stat -= sampler_func2(x2t, boot_samples, rng, n2, stat_func2, q)
+        gens = (rng,)
+    boot_stat = sampler_func1(stat_name, x1t, gens, n1, boot_samples, q)
+    if n2 > 0:
+        boot_stat -= sampler_func2(stat_name, x2t, gens, n2, boot_samples, q)
 
     # Get confidence intervals for the bootstrap samples
     quants = ci_func(boot_stat, ci_alphas, jack_func, x1t, x2t, n1, n2)

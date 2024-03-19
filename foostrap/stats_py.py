@@ -1,122 +1,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from numba import njit
 from scipy.stats import norm
 
-@njit(fastmath=True, cache=True)
-def numba_mean(a):
-    # Compute the mean of a
-    n = len(a)
-    s = a.dtype.type(0)
-    for i in range(n):
-        s += a[i]
-    return s / n
-
-@njit(fastmath=True, cache=True)
-def numba_mean_sparse(a, n):
-    # Compute the mean of sparse a
-    nnz = len(a)
-    s = a.dtype.type(0)
-    for i in range(nnz):
-        s += a[i]
-    return s / n
-
-@njit(fastmath=True, cache=True)
-def numba_mean_bin(a, n):
-    # Compute the mean of binary a
-    return a / n
-
-@njit(fastmath=True, cache=True)
-def numba_std(a):
-    # Compute the standard deviation of a
-    n = len(a)
-    sx = a.dtype.type(0)
-    sx2 = sx
-    for i in range(n):
-        sx += a[i]
-        sx2 += a[i] ** 2
-    return np.sqrt(sx2 / n - (sx / n) ** 2)
-
-@njit(fastmath=True, cache=True)
-def numba_std_sparse(a, n):
-    # Compute the standard deviation of sparse a
-    nnz = len(a)
-    sx = a.dtype.type(0)
-    sx2 = sx
-    for i in range(nnz):
-        sx += a[i]
-        sx2 += a[i] ** 2
-    return np.sqrt(sx2 / n - (sx / n) ** 2)
-
-@njit(fastmath=True, cache=True)
-def numba_std_bin(a, n):
-    # Compute the standard deviation of binary a
-    p = a / n
-    return np.sqrt(p * (1.0 - p))
-
-@njit(fastmath=True, cache=True)
-def quantile_dense(a, q):
-    # Compute the q-quantile of dense a
-    return np.quantile(a, q)
-
-@njit(fastmath=True, cache=True)
-def quantile_sparse(a, n, q):
-    # Compute the q-quantile of sparse a
-    return np.quantile(np.concatenate((np.zeros(n-len(a), dtype= a.dtype), a)), q)
-
-@njit(fastmath=True, cache=True)
-def quantile_bin(a, n, q):
-    # Compute the q-quantile of binary a
-    nz = n - a
-    idx = q * (n-1) + 1.0
-    idx_lo = int(np.floor(idx))
-    return 1.0 * (nz < idx_lo) + (idx - idx_lo) * (nz == idx_lo)
-
-@njit(fastmath= True, cache=True)
-def ratio_rows(a):
-    # Compute the ratio of sums of consecutive rows
-    n = a.shape[1]
-    sn = a.dtype.type(0)
-    sd = sn
-    for i in range(n):
-        sn += a[0,i]
-        sd += a[1,i]
-    if sd != 0:
-        return sn / sd
-    else:
-        return np.nan
-
-@njit(fastmath= True, cache=True)
-def wmean_rows(a):
-    # Compute the weighted mean of consecutive rows
-    n = a.shape[1]
-    sxw = a.dtype.type(0)
-    sw = sxw
-    for i in range(n):
-        sxw += a[0,i] * a[1,i]
-        sw += a[1,i]
-    if sw != 0:
-        return sxw / sw
-    else:
-        return np.nan
-
-@njit(fastmath= True, cache=True)
-def pearson_rows(a):
-    # Compute the pearson correlation of consecutive rows
-    n = a.shape[1]
-    sx = a.dtype.type(0)
-    sy, sxy, sx2, sy2 = sx, sx, sx, sx
-    for i in range(n):
-        sx += a[0,i]
-        sx2 += a[0,i] ** 2
-        sy += a[1,i]
-        sy2 += a[1,i] ** 2
-        sxy += a[0,i] * a[1,i]
-    denom = np.sqrt((n * sx2 - sx ** 2)*(n * sy2 - sy ** 2))
-    if denom != 0.0:
-        return (n * sxy - sx * sy) / denom
-    else:
-        return np.nan
+### BCa AND QUANTILES METHODS ###
 
 def jacknife_mean(x, n1, n2):
     # Generate jacknife estimates for the mean
@@ -170,7 +56,16 @@ def jacknife_pearson(x, n1, n2):
     jacks = (n_ext * (sxy - xy_ext[0,:] * xy_ext[1,:]) - (sx - xy_ext[0,:]) * (sy - xy_ext[1,:])) / \
         np.sqrt((n_ext * (sx2 - xy_ext[0,:] ** 2) - (sx - xy_ext[0,:])**2) * (n_ext * (sy2 - xy_ext[1,:] ** 2) - (sy - xy_ext[1,:])**2))
     return stat, jacks
-    
+
+# Statistic -> jackknife estimator
+jack_func_map = {'mean' : jacknife_mean,
+                 'std' : jacknife_std,
+                 'quantile' : jacknife_quantile,
+                 'ratio' : jacknife_ratio,
+                 'wmean' : jacknife_wmean,
+                 'pearson' : jacknife_pearson,
+                }
+
 def jacknife_wrapper(x1, x2, n1, n2, jack_func):
     # Call the jack_func statistic over 1 or 2 samples and compute the difference
     samp_stat, jacks = jack_func(x1, n1, n2)
@@ -206,27 +101,3 @@ def ci_est_bca(samps, ci_alphas, jack_func, x1, x2, n1, n2):
         per_norm_hi = b + norm.ppf(ci_alphas[1])
         ci_hi = min(1.0, norm.cdf(b + per_norm_hi/(1.0 - acc*per_norm_hi)))
     return ci_est_percent(samps, (ci_lo, ci_hi), jack_func, x1, x2, n1, n2)
-
-# (Statistic, Binary, Sparse) -> estimator function
-stat_func_map = {('mean',False,False) : numba_mean,
-                 ('mean',False,True) : numba_mean_sparse,
-                 ('mean',True,False) : numba_mean_bin,
-                 ('std',False,False) : numba_std,
-                 ('std',False,True) : numba_std_sparse,
-                 ('std',True,False) : numba_std_bin,
-                 ('quantile',False,False) : quantile_dense,
-                 ('quantile',False,True) : quantile_sparse,
-                 ('quantile',True,False) : quantile_bin,
-                 'ratio' : ratio_rows,
-                 'wmean' : wmean_rows,
-                 'pearson' : pearson_rows,
-                }
-
-# Statistic -> jackknife estimator
-jack_func_map = {'mean' : jacknife_mean,
-                 'std' : jacknife_std,
-                 'quantile' : jacknife_quantile,
-                 'ratio' : jacknife_ratio,
-                 'wmean' : jacknife_wmean,
-                 'pearson' : jacknife_pearson,
-                }

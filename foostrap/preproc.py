@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from scipy.stats import mode
-from .estimators import stat_func_map, jack_func_map, ci_est_percent, ci_est_bca
-from .samplers import sampler_map
+from .stats_numba import sampler_map
+from .stats_py import jack_func_map, ci_est_percent, ci_est_bca
 import warnings
 
 def check_sparsity(x, n, min_zeros= 0.1):
@@ -130,17 +130,11 @@ def preproc_args(x1, x2, statistic, q, boot_samples, conf_lvl, alternative, ci_m
         # Pick corresponding sampler and statistic function
         is_sparse1 = (not is_bin1) and (len(x1t) < n1)
         is_sparse2 = (not is_bin2) and (len(x2t) < n2)
-        extra_arg = statistic in ('quantile',)
-        sampler_func1 = sampler_map[(is_bin1, is_sparse1, extra_arg)]
-        sampler_func2 = sampler_map[(is_bin2, is_sparse2, extra_arg)]
-        stat_func1 = stat_func_map[(statistic, is_bin1, is_sparse1)]
-        stat_func2 = stat_func_map[(statistic, is_bin2, is_sparse2)]
-        if is_bin1 and is_bin2:
-            parallel = False
+        sampler_func1 = sampler_map[(1, is_bin1, is_sparse1)]
+        sampler_func2 = sampler_map[(1, is_bin2, is_sparse2)]
     else:
         # If using paired statistics, sparsity doesn't apply
-        sampler_func1, sampler_func2 = sampler_map['2d'], sampler_map['2d']
-        stat_func1, stat_func2 = stat_func_map[statistic], stat_func_map[statistic]
+        sampler_func1, sampler_func2 = sampler_map[(2, False, False)], sampler_map[(2, False, False)]
     
     # Get jacknife estimator
     jack_func = jack_func_map[statistic] if statistic != 'quantile' else lambda x, n1, n2 : jack_func_map['quantile'](x, n1, n2, q)
@@ -162,4 +156,4 @@ def preproc_args(x1, x2, statistic, q, boot_samples, conf_lvl, alternative, ci_m
             warn_pearson(x2t[0,:], n2, boot_samples, 0.001)
             warn_pearson(x2t[1,:], n2, boot_samples, 0.001)
     
-    return x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, stat_func1, stat_func2, jack_func, ci_func
+    return x1t, x2t, rng, parallel, n1, n2, ci_alphas, sampler_func1, sampler_func2, statistic, jack_func, ci_func
