@@ -1,4 +1,10 @@
 # Foostrap: Fast Bootstrap Resampling
+[![PyPI version](https://badge.fury.io/py/foostrap.svg)](https://badge.fury.io/py/foostrap)
+![Python Version](https://img.shields.io/badge/python-3.9-orange.svg)
+![Numpy Version](https://img.shields.io/badge/numpy-1.25-blue.svg)
+![Numba Version](https://img.shields.io/badge/numba-0.58-blue.svg)
+![Scipy Version](https://img.shields.io/badge/scipy-1.11-blue.svg)
+[![License](https://img.shields.io/pypi/l/foostrap.svg)](https://github.com/japlete/foostrap/blob/main/LICENSE)
 
 ## Overview
 Foostrap is a simple Python library for efficient bootstrap resampling and confidence interval estimation.
