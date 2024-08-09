@@ -5,7 +5,7 @@ from scipy.stats import norm
 ### BCa AND QUANTILES METHODS ###
 
 def jacknife_mean(x, n1, n2):
-    # Generate jacknife estimates for the mean
+    # Generate jacknife estimates for the mean of x of length n1, leaving n2 samples unaltered for x2
     s = x.sum()
     return s / n1, \
         (s - np.pad(x, (0, n1 - len(x) + n2))) / \
@@ -13,7 +13,7 @@ def jacknife_mean(x, n1, n2):
                         np.full(n2,n1,dtype=np.float64)))
 
 def jacknife_std(x, n1, n2):
-    # Generate jacknife estimates for the standard deviation
+    # Generate jacknife estimates for the standard deviation of x of length n1, leaving n2 samples unaltered for x2
     s = x.sum()
     s2 = (x**2).sum()
     denom = np.concatenate((np.full(n1,n1-1,dtype=np.float64), np.full(n2,n1,dtype=np.float64)))
@@ -22,7 +22,7 @@ def jacknife_std(x, n1, n2):
         np.sqrt((s2 - x_ext**2)/denom - ((s - x_ext)/denom)**2)
 
 def jacknife_quantile(x, n1, n2, q):
-    # Generate jacknife estimates for the q-quantile
+    # Generate jacknife estimates for the q-quantile of x of length n1, leaving n2 samples unaltered for x2
     xs = np.sort(np.pad(x, (n1 - len(x), 0)))
     stat = np.quantile(xs, q)
     idx = q * (n1-2)
@@ -33,20 +33,20 @@ def jacknife_quantile(x, n1, n2, q):
     return stat, np.pad((xhi - xlo) * (idx - idx_lo), (0, n2), constant_values= stat)
 
 def jacknife_ratio(x, n1, n2):
-    # Generate jacknife estimates for the ratio of sums
+    # Generate jacknife estimates for the ratio of sums of x of length n1, leaving n2 samples unaltered for x2
     s = x.sum(axis= 1)
     jacks = s.reshape(2,1) - np.pad(x, ((0,0),(0,n2)))
     return s[0] / s[1], jacks[0,:] / jacks[1,:]
 
 def jacknife_wmean(x, n1, n2):
-    # Generate jacknife estimates for the weighted mean
+    # Generate jacknife estimates for the weighted mean of x of length n1, leaving n2 samples unaltered for x2
     xw = np.dot(x[0,:], x[1,:])
     w = x[1,:].sum()
     xw_ext = np.pad(x, ((0,0), (0,n2)))
     return xw / w, (xw - xw_ext[0,:] * xw_ext[1,:]) / (w - xw_ext[1:])
 
 def jacknife_pearson(x, n1, n2):
-    # Generate jacknife estimates for the pearson correlation
+    # Generate jacknife estimates for the pearson correlation of x of length n1, leaving n2 samples unaltered for x2
     sx, sy = x.sum(axis= 1)
     sx2, sy2 = (x ** 2).sum(axis= 1)
     sxy = np.dot(x[0,:], x[1,:])

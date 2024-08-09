@@ -146,7 +146,7 @@ def bstrap_sampler_1d(stat_name, x, gens, n, n_boot, arg):
     
 @njit(parallel=True, fastmath=True, cache=True)
 def bstrap_sampler_2d(stat_name, x, gens, n, n_boot, arg):
-    # Generate n_boot bootstrap samples for 1D array x using generators gens and compute the statistic
+    # Generate n_boot bootstrap samples for 2D array x using generators gens and compute the statistic
     nt = len(gens)
     thread_samps = np.array([n_boot // nt] * nt) + np.array([1] * (n_boot % nt) + [0] * (nt - (n_boot % nt)))
     idxs = [0] + list(np.cumsum(thread_samps))
@@ -169,7 +169,7 @@ def bstrap_sampler_2d(stat_name, x, gens, n, n_boot, arg):
 
 @njit(parallel=True, fastmath=True, cache=True)
 def bstrap_sampler_1d_sparse(stat_name, x, gens, n, n_boot, arg):
-    # Generate n_boot bootstrap samples for 1D array x using generators gens and compute the statistic
+    # Generate n_boot bootstrap samples for 1D sparse array x using generators gens and compute the statistic
     nt = len(gens)
     nnz = len(x)
     p = nnz / n
@@ -197,7 +197,7 @@ def bstrap_sampler_1d_sparse(stat_name, x, gens, n, n_boot, arg):
 
 @njit(fastmath=True, cache=True)
 def bstrap_sampler_1d_bin(stat_name, x, gens, n, n_boot, arg):
-    # Generate n_boot bootstrap samples for 1D array x using generators gens and compute the statistic
+    # Generate n_boot bootstrap samples for 1D binary array x using generators gens and compute the statistic
     p = x.sum() / n
     gen = gens[0]
     with objmode(n_ones='int64[:]'):
