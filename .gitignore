@@ -1,7 +1,8 @@
-foostrap/.ipynb_checkpoints/*
-foostrap/__pycache__/*
-tests/.ipynb_checkpoints/*
+**/.ipynb_checkpoints/*
+**/__pycache__/*
 *.ipynb
 !benchmark.ipynb
-.ipynb_checkpoints/*
 dist/*
+.vscode/*
+.cursorignore
+*.txt

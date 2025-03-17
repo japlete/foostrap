@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "foostrap"
 description = "Fast Bootstrap statistics using Numba"
-version = "1.1.1"
+version = "1.2.1"
 dependencies = [
   "numpy>=1.25",
-  "numba>=0.58",
+  "numba>=0.61",
   "scipy>=1.11"
 ]
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 authors = [{ name="Jose A Poblete", email="jose.a.poblete@pm.me" }]
 keywords = ["bootstrap", "confidence interval", "ab testing"]
 classifiers = [
@@ -19,6 +19,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 readme = "README.md"
+license = {file = "LICENSE"}
 
 [project.optional-dependencies]
 iccrt = ["icc-rt"]

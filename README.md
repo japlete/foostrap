@@ -1,12 +1,14 @@
 # Foostrap: Fast Bootstrap Resampling
+
 [![PyPI version](https://badge.fury.io/py/foostrap.svg)](https://badge.fury.io/py/foostrap)
-![Python Version](https://img.shields.io/badge/python-3.9-orange.svg)
+![Python Version](https://img.shields.io/badge/python-3.10-orange.svg)
 ![Numpy Version](https://img.shields.io/badge/numpy-1.25-blue.svg)
-![Numba Version](https://img.shields.io/badge/numba-0.58-blue.svg)
+![Numba Version](https://img.shields.io/badge/numba-0.61-blue.svg)
 ![Scipy Version](https://img.shields.io/badge/scipy-1.11-blue.svg)
 [![License](https://img.shields.io/pypi/l/foostrap.svg)](https://github.com/japlete/foostrap/blob/main/LICENSE)
 
 ## Overview
+
 Foostrap is a simple Python library for efficient bootstrap resampling and confidence interval estimation.
 
 ## Features
@@ -15,19 +17,19 @@ Foostrap is a simple Python library for efficient bootstrap resampling and confi
 - Implements the Bias-Corrected and Accelerated (BCa) method for CI estimation. Can also use percentiles.
 - Optimized for sparse and binary data. The number of zeros is drawn from a Binomial distribution, instead of resampling them individually.
 - Supported statistics:
-    - For 1-dimensional data: mean, standard deviation, quantile q
-    - For 2-dimensional paired data: ratio of sums, weighted mean and pearson correlation
+  - For 1-dimensional data: mean, standard deviation, quantile q
+  - For 2-dimensional paired data: ratio of sums, weighted mean and pearson correlation
 - Robust: unit tests validate edge cases and results within 2 decimal places from Scipy bootstrap.
 
 ## Installation
 
-```
+```bash
 pip install foostrap
 ```
 
 or optionally, if you also want icc-rt as recommended by Numba:
 
-```
+```bash
 pip install foostrap[iccrt]
 ```
 
@@ -72,11 +74,13 @@ print(result.ci)
 A data class containing the confidence interval (`ci`) as a tuple and the bootstrap samples (`boot_samples`) as a numpy array.
 
 ### Notes
+
 1. The first execution will take a few seconds longer since Numba takes time to compile the functions for the first time. The compiled functions are cached in the `__pycache__` in the library installation directory. You can save the cached functions and reuse them in another machine, as long as it has the same package versions and CPU.
 2. Each thread gets a separate random generator, spawned from the user supplied or the default. This means that for the results to be reproducible, the number of CPU cores must remain constant.
 3. Only the 1-D statistics have the sparse and binary data optimization, since paired data typically doesn't have zeros in both values of an observation.
 
 ### More examples
+
 ```python
 # Generate some data
 x1 = np.random.normal(size=100)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from numba import njit, objmode, prange
+from numba import njit, prange
 
 ### STATISTICS SECTION ###
 
@@ -176,8 +176,7 @@ def bstrap_sampler_1d_sparse(stat_name, x, gens, n, n_boot, arg):
     thread_samps = np.array([n_boot // nt] * nt) + np.array([1] * (n_boot % nt) + [0] * (nt - (n_boot % nt)))
     idxs = [0] + list(np.cumsum(thread_samps))
     boot_stat = np.empty(n_boot)
-    with objmode(nzboot='int64[:]'):
-        nzboot = gens[0].binomial(n, p, n_boot)
+    nzboot = gens[0].binomial(n, p, n_boot)
     for i in prange(nt):
         local_n = thread_samps[i]
         local_gen = gens[i]
@@ -200,8 +199,7 @@ def bstrap_sampler_1d_bin(stat_name, x, gens, n, n_boot, arg):
     # Generate n_boot bootstrap samples for 1D binary array x using generators gens and compute the statistic
     p = x.sum() / n
     gen = gens[0]
-    with objmode(n_ones='int64[:]'):
-        n_ones = gen.binomial(n, p, n_boot)
+    n_ones = gen.binomial(n, p, n_boot)
     if stat_name == 'mean':
         boot_stat = numba_mean_bin(n_ones, n)
     elif stat_name == 'std':
