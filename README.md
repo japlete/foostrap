@@ -1,6 +1,7 @@
 # Foostrap: Fast Bootstrap Resampling
 
 [![PyPI version](https://badge.fury.io/py/foostrap.svg)](https://badge.fury.io/py/foostrap)
+[![Downloads](https://pepy.tech/badge/foostrap)](https://pepy.tech/project/foostrap)
 ![Python Version](https://img.shields.io/badge/python-3.10-orange.svg)
 ![Numpy Version](https://img.shields.io/badge/numpy-1.25-blue.svg)
 ![Numba Version](https://img.shields.io/badge/numba-0.61-blue.svg)
