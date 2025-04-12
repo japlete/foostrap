@@ -6,7 +6,11 @@ from .preproc import preproc_args
 
 @dataclass
 class BootRes:
-    # Bootstrap results. Confidence interval tuple and array of samples
+    '''
+    Bootstrap results. Attributes:
+    - ci: Confidence interval as a tuple
+    - boot_samples: Array of bootstrap samples
+    '''
     ci: tuple
     boot_samples: np.array
 
